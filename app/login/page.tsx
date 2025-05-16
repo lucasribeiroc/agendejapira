@@ -1,32 +1,32 @@
-"use client";
+'use client'
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [senha, setSenha] = useState("");
-  const [erro, setErro] = useState("");
-  const router = useRouter();
+  const [email, setEmail] = useState('')
+  const [senha, setSenha] = useState('')
+  const [erro, setErro] = useState('')
+  const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
-      password: senha,
-    });
+      password: senha
+    })
 
     if (error) {
-      setErro("E-mail ou senha inválidos.");
+      setErro('E-mail ou senha inválidos.')
     } else {
-      router.push("/dashboard");
+      router.push('/dashboard')
     }
-  };
+  }
 
   return (
-    <div style={{ maxWidth: 400, margin: "50px auto" }}>
+    <div style={{ maxWidth: 400, margin: '50px auto' }}>
       <h2>Login</h2>
       <form onSubmit={handleLogin}>
         <input
@@ -44,8 +44,8 @@ export default function LoginPage() {
           required
         />
         <button type="submit">Entrar</button>
-        {erro && <p style={{ color: "red" }}>{erro}</p>}
+        {erro && <p style={{ color: 'red' }}>{erro}</p>}
       </form>
     </div>
-  );
+  )
 }

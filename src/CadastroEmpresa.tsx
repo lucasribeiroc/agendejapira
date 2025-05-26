@@ -51,15 +51,18 @@ function CadastroEmpresa() {
         sx={{
           bgcolor: "primary.main",
           color: "white",
-          py: { xs: 8, md: 12 },
+          py: { xs: 2, md: 4 }, // Reduzido para alinhar ao topo
           minHeight: "100vh",
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start", // Alinha ao topo
           justifyContent: "center",
         }}
       >
         <Container maxWidth="xs">
-          <Paper elevation={4} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 4 }}>
+          <Paper
+            elevation={4}
+            sx={{ p: { xs: 3, sm: 4 }, borderRadius: 4, mt: 4 }}
+          >
             <Typography
               variant="h4"
               align="center"

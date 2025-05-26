@@ -1,4 +1,15 @@
-import { Box, Typography, Button, Paper, Stack } from "@mui/material";
+import {
+  Typography,
+  Card,
+  CardContent,
+  CardActions,
+  CardHeader,
+  Grid,
+  Container,
+  IconButton,
+} from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 
@@ -32,64 +43,112 @@ function ListarEmpresas() {
 
   const handleEditar = (empresa: Empresa) => {
     alert("Funcionalidade de edição não implementada neste exemplo.");
-    // Aqui você pode abrir um modal ou navegar para uma página de edição
   };
 
   if (loading) return <Typography>Carregando...</Typography>;
 
   return (
-    <Box>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
       <Typography
         variant="h5"
-        sx={{ mb: 2, color: "primary.main", fontWeight: 700 }}
+        align="center"
+        sx={{ mb: 3, color: "white", fontWeight: 700 }}
       >
         Empresas cadastradas
       </Typography>
       {empresas.length === 0 ? (
-        <Typography>Nenhuma empresa cadastrada.</Typography>
+        <Typography align="center" color="white">
+          Nenhuma empresa cadastrada.
+        </Typography>
       ) : (
-        <Stack spacing={2}>
+        <Grid container spacing={4}>
           {empresas.map((empresa) => (
-            <Paper
-              key={empresa.id}
-              sx={{
-                p: 2,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                borderRadius: 2,
-              }}
-            >
-              <Box>
-                <Typography fontWeight={600}>{empresa.nome}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {empresa.email} | {empresa.telefone}
-                </Typography>
-              </Box>
-              <Box>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  size="small"
-                  sx={{ mr: 1 }}
-                  onClick={() => handleEditar(empresa)}
+            <Grid item xs={12} md={6} key={empresa.id}>
+              <Card
+                elevation={4}
+                sx={{
+                  borderRadius: 3,
+                  minWidth: 340,
+                  maxWidth: 600,
+                  margin: "0 auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  height: "100%",
+                }}
+              >
+                <CardHeader
+                  title={
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        color: "#0A1929", // Azul mais escuro
+                        fontWeight: 700,
+                        textAlign: "center",
+                        fontSize: "1.2rem",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {empresa.nome}
+                    </Typography>
+                  }
+                  sx={{
+                    bgcolor: "rgba(10, 25, 41, 0.08)", // Fundo sutil do azul escuro
+                    p: 2,
+                    borderTopLeftRadius: 12,
+                    borderTopRightRadius: 12,
+                  }}
+                />
+                <CardContent
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flex: 1,
+                    textAlign: "center",
+                    px: 3,
+                    py: 2,
+                  }}
                 >
-                  Editar
-                </Button>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="small"
-                  onClick={() => handleExcluir(empresa.id)}
+                  <Typography variant="body2" sx={{ color: "#222", mb: 1 }}>
+                    {empresa.email}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "#222" }}>
+                    {empresa.telefone}
+                  </Typography>
+                </CardContent>
+                <CardActions
+                  sx={{
+                    justifyContent: "center",
+                    width: "100%",
+                    borderTop: "1px solid #eee",
+                    py: 1,
+                  }}
                 >
-                  Excluir
-                </Button>
-              </Box>
-            </Paper>
+                  <IconButton
+                    color="primary"
+                    aria-label="Editar empresa"
+                    title="Editar empresa"
+                    onClick={() => handleEditar(empresa)}
+                  >
+                    <EditIcon fontSize="medium" />
+                  </IconButton>
+                  <IconButton
+                    color="error"
+                    aria-label="Excluir empresa"
+                    title="Excluir empresa"
+                    onClick={() => handleExcluir(empresa.id)}
+                  >
+                    <DeleteIcon fontSize="medium" />
+                  </IconButton>
+                </CardActions>
+              </Card>
+            </Grid>
           ))}
-        </Stack>
+        </Grid>
       )}
-    </Box>
+    </Container>
   );
 }
 

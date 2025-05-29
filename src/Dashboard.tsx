@@ -16,6 +16,8 @@ import {
   ListItemIcon,
   ListItemText,
   IconButton,
+  Avatar,
+  Paper,
 } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -40,7 +42,8 @@ import {
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import theme from "./theme";
-import DashboardMasterStats from "./DashboardMasterStats"; // Importa o componente dos gráficos
+import DashboardMasterStats from "./DashboardMasterStats";
+import { format, addDays, subDays, isAfter, isBefore } from "date-fns";
 
 const drawerWidth = 220;
 const drawerCollapsedWidth = 64;
@@ -50,6 +53,11 @@ function Dashboard() {
   const location = useLocation();
   const [empresa, setEmpresa] = useState<string>("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // Agendamentos
+  const [agendamentos, setAgendamentos] = useState<any[]>([]);
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -62,6 +70,8 @@ function Dashboard() {
     };
   }, []);
 
+  const isMaster = localStorage.getItem("is_master") === "true";
+
   useEffect(() => {
     const nome = localStorage.getItem("usuario_nome");
     if (nome) {
@@ -69,7 +79,37 @@ function Dashboard() {
     } else {
       navigate("/login");
     }
-  }, [navigate]);
+    // Busca o logotipo da empresa (apenas para empresas, não master)
+    const usuarioId = localStorage.getItem("usuario_id");
+    if (usuarioId && !isMaster) {
+      supabase
+        .from("usuarios")
+        .select("logotipo")
+        .eq("id", usuarioId)
+        .single()
+        .then(({ data }) => {
+          setLogoUrl(data?.logotipo || null);
+        });
+    }
+  }, [navigate, isMaster]);
+
+  // Buscar agendamentos do dia corrente para empresas
+  useEffect(() => {
+    if (isMaster) return;
+    const usuarioId = localStorage.getItem("usuario_id");
+    if (!usuarioId) return;
+
+    // Pega apenas a data no formato yyyy-mm-dd
+    const dataFormatada = currentDate.toISOString().slice(0, 10);
+
+    supabase
+      .from("agendamentos")
+      .select("*")
+      .eq("empresa_id", usuarioId)
+      .eq("data", dataFormatada)
+      .order("data", { ascending: true })
+      .then(({ data }) => setAgendamentos(data || []));
+  }, [currentDate, isMaster]);
 
   const handleLogout = async () => {
     localStorage.removeItem("usuario_id");
@@ -78,8 +118,6 @@ function Dashboard() {
     await supabase.auth.signOut();
     navigate("/login");
   };
-
-  const isMaster = localStorage.getItem("is_master") === "true";
 
   const menuItems = [
     {
@@ -141,14 +179,12 @@ function Dashboard() {
   const isDashboardHome =
     location.pathname === "/dashboard" || location.pathname === "/dashboard/";
 
-  // Detecta se está em uma página de formulário (corrigido para startsWith)
   const isFormPage = [
     "/dashboard/cadastrar-servico",
     "/dashboard/cadastro",
     "/dashboard/cadastrar-cliente",
   ].some((path) => location.pathname.startsWith(path));
 
-  // Renderiza o conteúdo correto
   let conteudo = null;
   if (isDashboardHome) {
     conteudo = isMaster ? (
@@ -173,20 +209,49 @@ function Dashboard() {
     ) : (
       <>
         <Typography
-          variant="h3"
+          variant="h4"
           align="center"
           fontWeight={700}
           sx={{ mb: 2, fontFamily: "Montserrat, Arial" }}
         >
-          Bem-vindo{empresa ? `, ${empresa}` : ""} ao seu Dashboard!
+          Agendamentos do dia {format(currentDate, "dd/MM/yyyy")}
         </Typography>
-        <Typography
-          variant="h6"
-          align="center"
-          sx={{ mb: 4, color: "rgba(255,255,255,0.85)" }}
-        >
-          Aqui você poderá gerenciar seus agendamentos, clientes e serviços.
-        </Typography>
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setCurrentDate(subDays(currentDate, 1))}
+            disabled={isBefore(subDays(currentDate, 1), subDays(new Date(), 7))}
+            sx={{ mr: 1 }}
+          >
+            Dia anterior
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => setCurrentDate(addDays(currentDate, 1))}
+            disabled={isAfter(addDays(currentDate, 1), addDays(new Date(), 7))}
+          >
+            Próximo dia
+          </Button>
+        </Box>
+        {agendamentos.length === 0 ? (
+          <Typography align="center" sx={{ color: "#ccc" }}>
+            Nenhum agendamento para este dia.
+          </Typography>
+        ) : (
+          <Box>
+            {agendamentos.map((ag) => (
+              <Paper key={ag.id} sx={{ mb: 2, p: 2 }}>
+                <Typography>
+                  <b>Cliente:</b> {ag.cliente_nome}
+                </Typography>
+                <Typography>
+                  <b>Horário:</b> {format(new Date(ag.data), "HH:mm")}
+                </Typography>
+                {/* Adicione mais campos conforme necessário */}
+              </Paper>
+            ))}
+          </Box>
+        )}
       </>
     );
   } else {
@@ -223,7 +288,6 @@ function Dashboard() {
         </Toolbar>
       </AppBar>
 
-      {/* Flex container em coluna para ocupar toda a tela */}
       <Box
         sx={{
           display: "flex",
@@ -232,7 +296,6 @@ function Dashboard() {
           bgcolor: "primary.main",
         }}
       >
-        {/* Drawer + Conteúdo */}
         <Box sx={{ display: "flex", flex: 1, pt: 8 }}>
           {/* Drawer (Menu Lateral) */}
           <Drawer
@@ -259,6 +322,48 @@ function Dashboard() {
           >
             {/* Toolbar ainda menor para aproximar os botões do topo */}
             <Toolbar sx={{ minHeight: 4, px: 0 }} />
+            {/* Logotipo da empresa (apenas para empresas e quando expandido) */}
+            {!isMaster && drawerOpen && logoUrl && (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  mt: 0.5,
+                  mb: 1,
+                  px: 2,
+                }}
+              >
+                <Avatar
+                  src={logoUrl}
+                  alt="Logotipo da empresa"
+                  variant="rounded"
+                  sx={{
+                    width: 120,
+                    height: 35,
+                    mb: 1,
+                    bgcolor: "#fff",
+                    border: "1px solid #eee",
+                    objectFit: "contain",
+                  }}
+                  imgProps={{
+                    style: { objectFit: "contain", width: 120, height: 35 },
+                  }}
+                />
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    textAlign: "center",
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {empresa}
+                </Typography>
+              </Box>
+            )}
             <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
               <List sx={{ mt: 0, pt: 0 }}>
                 {menuItems

@@ -7,6 +7,12 @@ import {
   Grid,
   Container,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -23,6 +29,18 @@ interface Empresa {
 function ListarEmpresas() {
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Modal de edição
+  const [editOpen, setEditOpen] = useState(false);
+  const [editEmpresa, setEditEmpresa] = useState<Empresa | null>(null);
+  const [editFields, setEditFields] = useState({
+    nome: "",
+    email: "",
+    telefone: "",
+  });
+
+  // Modal de confirmação de edição
+  const [confirmEditOpen, setConfirmEditOpen] = useState(false);
 
   useEffect(() => {
     async function fetchEmpresas() {
@@ -42,7 +60,57 @@ function ListarEmpresas() {
   };
 
   const handleEditar = (empresa: Empresa) => {
-    alert("Funcionalidade de edição não implementada neste exemplo.");
+    setEditEmpresa(empresa);
+    setEditFields({
+      nome: empresa.nome,
+      email: empresa.email,
+      telefone: empresa.telefone,
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditFieldChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditFields((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  // Ao clicar em salvar, abre o modal de confirmação
+  const handleEditSave = () => {
+    setConfirmEditOpen(true);
+  };
+
+  // Confirma a edição e salva no banco
+  const handleConfirmEdit = async () => {
+    if (!editEmpresa) return;
+    const { nome, email, telefone } = editFields;
+    const { error } = await supabase
+      .from("usuarios")
+      .update({
+        nome,
+        email,
+        telefone,
+      })
+      .eq("id", editEmpresa.id);
+    if (!error) {
+      setEmpresas((prev) =>
+        prev.map((e) =>
+          e.id === editEmpresa.id ? { ...e, nome, email, telefone } : e
+        )
+      );
+      setEditOpen(false);
+      setEditEmpresa(null);
+      setConfirmEditOpen(false);
+    } else {
+      alert("Erro ao atualizar: " + error.message);
+      setConfirmEditOpen(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditOpen(false);
+    setEditEmpresa(null);
   };
 
   if (loading) return <Typography>Carregando...</Typography>;
@@ -61,9 +129,15 @@ function ListarEmpresas() {
           Nenhuma empresa cadastrada.
         </Typography>
       ) : (
-        <Grid container spacing={4}>
+        <Grid container spacing={4} justifyContent="center">
           {empresas.map((empresa) => (
-            <Grid item xs={12} md={6} key={empresa.id}>
+            <Grid
+              item
+              xs={12}
+              md={6}
+              key={empresa.id}
+              sx={{ display: "flex", justifyContent: "center" }}
+            >
               <Card
                 elevation={4}
                 sx={{
@@ -82,7 +156,7 @@ function ListarEmpresas() {
                     <Typography
                       variant="h6"
                       sx={{
-                        color: "#0A1929", // Azul mais escuro
+                        color: "#0A1929",
                         fontWeight: 700,
                         textAlign: "center",
                         fontSize: "1.2rem",
@@ -93,7 +167,7 @@ function ListarEmpresas() {
                     </Typography>
                   }
                   sx={{
-                    bgcolor: "rgba(10, 25, 41, 0.08)", // Fundo sutil do azul escuro
+                    bgcolor: "rgba(10, 25, 41, 0.08)",
                     p: 2,
                     borderTopLeftRadius: 12,
                     borderTopRightRadius: 12,
@@ -148,6 +222,76 @@ function ListarEmpresas() {
           ))}
         </Grid>
       )}
+
+      {/* Modal de edição */}
+      <Dialog
+        open={editOpen}
+        onClose={handleEditCancel}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Editar Empresa</DialogTitle>
+        <DialogContent
+          sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}
+        >
+          <TextField
+            label="Nome"
+            name="nome"
+            value={editFields.nome}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Email"
+            name="email"
+            value={editFields.email}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Telefone"
+            name="telefone"
+            value={editFields.telefone}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEditCancel} color="inherit">
+            Cancelar
+          </Button>
+          <Button onClick={handleEditSave} color="primary" variant="contained">
+            Salvar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de confirmação de edição */}
+      <Dialog
+        open={confirmEditOpen}
+        onClose={() => setConfirmEditOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Confirmar Alteração</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Tem certeza que deseja salvar as alterações desta empresa?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmEditOpen(false)} color="inherit">
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleConfirmEdit}
+            color="primary"
+            variant="contained"
+          >
+            Confirmar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

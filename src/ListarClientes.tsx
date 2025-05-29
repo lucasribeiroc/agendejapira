@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  TextField,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -27,6 +28,28 @@ function ListarClientes() {
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [empresaFiltro, setEmpresaFiltro] = useState<string>("");
   const [loading, setLoading] = useState(true);
+
+  // Modal de edição
+  const [editOpen, setEditOpen] = useState(false);
+  const [editCliente, setEditCliente] = useState<any | null>(null);
+  const [editFields, setEditFields] = useState({
+    nome: "",
+    telefone: "",
+    email: "",
+    endereco: "",
+    numero: "",
+    bairro: "",
+    cidade: "",
+    uf: "",
+    cep: "",
+    rg: "",
+    cpf: "",
+  });
+
+  // Modal de confirmação de edição
+  const [confirmEditOpen, setConfirmEditOpen] = useState(false);
+
+  // Modal de confirmação de exclusão
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     id?: string;
@@ -87,9 +110,102 @@ function ListarClientes() {
     setConfirmDialog({ open: false });
   };
 
-  // Editar cliente (implemente a navegação para tela de edição se desejar)
-  const handleEdit = (id: string) => {
-    window.location.href = `/dashboard/editar-cliente/${id}`;
+  // Editar cliente
+  const handleEdit = (cli: any) => {
+    setEditCliente(cli);
+    setEditFields({
+      nome: cli.nome || "",
+      telefone: cli.telefone || "",
+      email: cli.email || "",
+      endereco: cli.endereco || "",
+      numero: cli.numero || "",
+      bairro: cli.bairro || "",
+      cidade: cli.cidade || "",
+      uf: cli.uf || "",
+      cep: cli.cep || "",
+      rg: cli.rg || "",
+      cpf: cli.cpf || "",
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditFieldChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditFields((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  // Ao clicar em salvar, abre o modal de confirmação
+  const handleEditSave = () => {
+    setConfirmEditOpen(true);
+  };
+
+  // Confirma a edição e salva no banco
+  const handleConfirmEdit = async () => {
+    if (!editCliente) return;
+    const {
+      nome,
+      telefone,
+      email,
+      endereco,
+      numero,
+      bairro,
+      cidade,
+      uf,
+      cep,
+      rg,
+      cpf,
+    } = editFields;
+    const { error } = await supabase
+      .from("clientes")
+      .update({
+        nome,
+        telefone,
+        email,
+        endereco,
+        numero,
+        bairro,
+        cidade,
+        uf,
+        cep,
+        rg,
+        cpf,
+      })
+      .eq("id", editCliente.id);
+    if (!error) {
+      setClientes((prev) =>
+        prev.map((c) =>
+          c.id === editCliente.id
+            ? {
+                ...c,
+                nome,
+                telefone,
+                email,
+                endereco,
+                numero,
+                bairro,
+                cidade,
+                uf,
+                cep,
+                rg,
+                cpf,
+              }
+            : c
+        )
+      );
+      setEditOpen(false);
+      setEditCliente(null);
+      setConfirmEditOpen(false);
+    } else {
+      alert("Erro ao atualizar: " + error.message);
+      setConfirmEditOpen(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditOpen(false);
+    setEditCliente(null);
   };
 
   return (
@@ -227,7 +343,7 @@ function ListarClientes() {
                     >
                       <IconButton
                         color="primary"
-                        onClick={() => handleEdit(cli.id)}
+                        onClick={() => handleEdit(cli)}
                         title="Editar"
                       >
                         <EditIcon />
@@ -270,6 +386,132 @@ function ListarClientes() {
             variant="contained"
           >
             Excluir
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de edição */}
+      <Dialog
+        open={editOpen}
+        onClose={handleEditCancel}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Editar Cliente</DialogTitle>
+        <DialogContent
+          sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}
+        >
+          <TextField
+            label="Nome"
+            name="nome"
+            value={editFields.nome}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Telefone"
+            name="telefone"
+            value={editFields.telefone}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Email"
+            name="email"
+            value={editFields.email}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Endereço"
+            name="endereco"
+            value={editFields.endereco}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Número"
+            name="numero"
+            value={editFields.numero}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Bairro"
+            name="bairro"
+            value={editFields.bairro}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Cidade"
+            name="cidade"
+            value={editFields.cidade}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="UF"
+            name="uf"
+            value={editFields.uf}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="CEP"
+            name="cep"
+            value={editFields.cep}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="RG"
+            name="rg"
+            value={editFields.rg}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="CPF"
+            name="cpf"
+            value={editFields.cpf}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEditCancel} color="inherit">
+            Cancelar
+          </Button>
+          <Button onClick={handleEditSave} color="primary" variant="contained">
+            Salvar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de confirmação de edição */}
+      <Dialog
+        open={confirmEditOpen}
+        onClose={() => setConfirmEditOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Confirmar Alteração</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Tem certeza que deseja salvar as alterações deste cliente?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmEditOpen(false)} color="inherit">
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleConfirmEdit}
+            color="primary"
+            variant="contained"
+          >
+            Confirmar
           </Button>
         </DialogActions>
       </Dialog>

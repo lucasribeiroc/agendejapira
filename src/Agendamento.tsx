@@ -100,6 +100,7 @@ function Agendamento() {
         data_hora: dataHora,
         observacoes,
         usuario_id,
+        status: "aberto", // Sempre cria como 'aberto'
       },
     ]);
     if (error) setMsg("Erro ao agendar: " + error.message);

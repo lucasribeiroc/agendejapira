@@ -11,6 +11,12 @@ import {
   Select,
   InputLabel,
   FormControl,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -32,6 +38,19 @@ function ListarServicos() {
   const [empresas, setEmpresas] = useState<any[]>([]);
   const [empresaFiltro, setEmpresaFiltro] = useState<string>("");
   const [loading, setLoading] = useState(true);
+
+  // Modal de edição
+  const [editOpen, setEditOpen] = useState(false);
+  const [editServico, setEditServico] = useState<Servico | null>(null);
+  const [editFields, setEditFields] = useState({
+    nome: "",
+    valor: "",
+    descricao: "",
+    duracao_minutos: "",
+  });
+
+  // Modal de confirmação de edição
+  const [confirmEditOpen, setConfirmEditOpen] = useState(false);
 
   const usuario_id = localStorage.getItem("usuario_id");
   const isMaster = localStorage.getItem("is_master") === "true";
@@ -85,7 +104,67 @@ function ListarServicos() {
   };
 
   const handleEditar = (servico: Servico) => {
-    alert("Funcionalidade de edição não implementada neste exemplo.");
+    setEditServico(servico);
+    setEditFields({
+      nome: servico.nome,
+      valor: String(servico.valor),
+      descricao: servico.descricao,
+      duracao_minutos: String(servico.duracao_minutos),
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditFieldChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditFields((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  // Ao clicar em salvar, abre o modal de confirmação
+  const handleEditSave = () => {
+    setConfirmEditOpen(true);
+  };
+
+  // Confirma a edição e salva no banco
+  const handleConfirmEdit = async () => {
+    if (!editServico) return;
+    const { nome, valor, descricao, duracao_minutos } = editFields;
+    const { error } = await supabase
+      .from("servicos")
+      .update({
+        nome,
+        valor: Number(valor),
+        descricao,
+        duracao_minutos: Number(duracao_minutos),
+      })
+      .eq("id", editServico.id);
+    if (!error) {
+      setServicos((prev) =>
+        prev.map((s) =>
+          s.id === editServico.id
+            ? {
+                ...s,
+                nome,
+                valor: Number(valor),
+                descricao,
+                duracao_minutos: Number(duracao_minutos),
+              }
+            : s
+        )
+      );
+      setEditOpen(false);
+      setEditServico(null);
+      setConfirmEditOpen(false);
+    } else {
+      alert("Erro ao atualizar: " + error.message);
+      setConfirmEditOpen(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditOpen(false);
+    setEditServico(null);
   };
 
   if (loading) return <Typography>Carregando...</Typography>;
@@ -139,9 +218,15 @@ function ListarServicos() {
           Nenhum serviço cadastrado.
         </Typography>
       ) : (
-        <Grid container spacing={4}>
+        <Grid container spacing={4} justifyContent="center">
           {servicos.map((servico) => (
-            <Grid item xs={12} md={6} key={servico.id}>
+            <Grid
+              item
+              xs={12}
+              md={6}
+              key={servico.id}
+              sx={{ display: "flex", justifyContent: "center" }}
+            >
               <Card
                 elevation={4}
                 sx={{
@@ -241,6 +326,85 @@ function ListarServicos() {
           ))}
         </Grid>
       )}
+
+      {/* Modal de edição */}
+      <Dialog
+        open={editOpen}
+        onClose={handleEditCancel}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Editar Serviço</DialogTitle>
+        <DialogContent
+          sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}
+        >
+          <TextField
+            label="Nome"
+            name="nome"
+            value={editFields.nome}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Valor"
+            name="valor"
+            type="number"
+            value={editFields.valor}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Descrição"
+            name="descricao"
+            value={editFields.descricao}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+          <TextField
+            label="Duração (minutos)"
+            name="duracao_minutos"
+            type="number"
+            value={editFields.duracao_minutos}
+            onChange={handleEditFieldChange}
+            fullWidth
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleEditCancel} color="inherit">
+            Cancelar
+          </Button>
+          <Button onClick={handleEditSave} color="primary" variant="contained">
+            Salvar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de confirmação de edição */}
+      <Dialog
+        open={confirmEditOpen}
+        onClose={() => setConfirmEditOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Confirmar Alteração</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Tem certeza que deseja salvar as alterações deste serviço?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmEditOpen(false)} color="inherit">
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleConfirmEdit}
+            color="primary"
+            variant="contained"
+          >
+            Confirmar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }

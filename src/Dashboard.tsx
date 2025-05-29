@@ -39,14 +39,47 @@ import {
   useLocation,
   Outlet,
 } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 import theme from "./theme";
 import DashboardMasterStats from "./DashboardMasterStats";
 import { format, addDays, subDays, isAfter, isBefore } from "date-fns";
+import { RealtimeChannel } from "@supabase/supabase-js";
 
 const drawerWidth = 220;
 const drawerCollapsedWidth = 64;
+
+// Função para cor do status (usada para o fundo do status)
+const statusBgColor = (status: string) => {
+  switch (status) {
+    case "aberto":
+      return "orange";
+    case "em_atendimento":
+      return "#1976d2";
+    case "concluido":
+      return "#388e3c";
+    case "cancelado":
+      return "#d32f2f";
+    default:
+      return "grey";
+  }
+};
+
+// Função para label do status
+const statusLabel = (status: string) => {
+  switch (status) {
+    case "aberto":
+      return "Aberto";
+    case "em_atendimento":
+      return "Em atendimento";
+    case "concluido":
+      return "Concluído";
+    case "cancelado":
+      return "Cancelado";
+    default:
+      return status;
+  }
+};
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -58,6 +91,13 @@ function Dashboard() {
   // Agendamentos
   const [agendamentos, setAgendamentos] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [realtimeChannel, setRealtimeChannel] =
+    useState<RealtimeChannel | null>(null);
+
+  // Limites de paginação
+  const today = new Date();
+  const minDate = subDays(today, 7);
+  const maxDate = addDays(today, 7);
 
   useEffect(() => {
     const link = document.createElement("link");
@@ -93,23 +133,70 @@ function Dashboard() {
     }
   }, [navigate, isMaster]);
 
-  // Buscar agendamentos do dia corrente para empresas
+  // Buscar agendamentos do dia corrente para empresas (join correto)
+  const fetchAgendamentos = useCallback(() => {
+    if (isMaster) return;
+    const usuarioId = localStorage.getItem("usuario_id");
+    if (!usuarioId) return;
+
+    const start = new Date(currentDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(currentDate);
+    end.setHours(23, 59, 59, 999);
+
+    supabase
+      .from("agendamentos")
+      .select(
+        `
+          *,
+          clientes:cliente_id (
+            nome
+          ),
+          servicos:servico_id (
+            nome
+          )
+        `
+      )
+      .eq("usuario_id", usuarioId)
+      .gte("data_hora", start.toISOString())
+      .lte("data_hora", end.toISOString())
+      .order("data_hora", { ascending: true })
+      .then(({ data }) => setAgendamentos(data || []));
+  }, [currentDate, isMaster]);
+
+  useEffect(() => {
+    fetchAgendamentos();
+  }, [fetchAgendamentos]);
+
+  // Realtime: escuta alterações na tabela agendamentos (canal criado só uma vez)
   useEffect(() => {
     if (isMaster) return;
     const usuarioId = localStorage.getItem("usuario_id");
     if (!usuarioId) return;
 
-    // Pega apenas a data no formato yyyy-mm-dd
-    const dataFormatada = currentDate.toISOString().slice(0, 10);
+    const channel = supabase
+      .channel("agendamentos_realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "agendamentos",
+          filter: `usuario_id=eq.${usuarioId}`,
+        },
+        () => {
+          fetchAgendamentos();
+        }
+      )
+      .subscribe();
 
-    supabase
-      .from("agendamentos")
-      .select("*")
-      .eq("empresa_id", usuarioId)
-      .eq("data", dataFormatada)
-      .order("data", { ascending: true })
-      .then(({ data }) => setAgendamentos(data || []));
-  }, [currentDate, isMaster]);
+    setRealtimeChannel(channel);
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line
+  }, [isMaster, fetchAgendamentos]);
 
   const handleLogout = async () => {
     localStorage.removeItem("usuario_id");
@@ -119,12 +206,18 @@ function Dashboard() {
     navigate("/login");
   };
 
+  // Atualiza dashboard ao clicar no menu
+  const handleRefreshDashboard = () => {
+    fetchAgendamentos();
+  };
+
   const menuItems = [
     {
       label: "Dashboard",
       icon: <DashboardIcon />,
       to: "/dashboard",
       show: true,
+      onClick: handleRefreshDashboard,
     },
     {
       label: "Cadastrar Serviço",
@@ -217,21 +310,35 @@ function Dashboard() {
           Agendamentos do dia {format(currentDate, "dd/MM/yyyy")}
         </Typography>
         <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-          <Button
-            variant="outlined"
+          <IconButton
             onClick={() => setCurrentDate(subDays(currentDate, 1))}
-            disabled={isBefore(subDays(currentDate, 1), subDays(new Date(), 7))}
-            sx={{ mr: 1 }}
+            disabled={isBefore(subDays(currentDate, 1), minDate)}
+            sx={{ mr: 1, color: "white" }}
+            color="primary"
           >
-            Dia anterior
-          </Button>
+            <ChevronLeftIcon />
+          </IconButton>
           <Button
             variant="outlined"
-            onClick={() => setCurrentDate(addDays(currentDate, 1))}
-            disabled={isAfter(addDays(currentDate, 1), addDays(new Date(), 7))}
+            disabled
+            sx={{
+              minWidth: 120,
+              fontWeight: 700,
+              color: "white",
+              borderColor: "#1976d2",
+              backgroundColor: "transparent",
+            }}
           >
-            Próximo dia
+            {format(currentDate, "dd/MM/yyyy")}
           </Button>
+          <IconButton
+            onClick={() => setCurrentDate(addDays(currentDate, 1))}
+            disabled={isAfter(addDays(currentDate, 1), maxDate)}
+            sx={{ ml: 1, color: "white" }}
+            color="primary"
+          >
+            <ChevronRightIcon />
+          </IconButton>
         </Box>
         {agendamentos.length === 0 ? (
           <Typography align="center" sx={{ color: "#ccc" }}>
@@ -240,14 +347,95 @@ function Dashboard() {
         ) : (
           <Box>
             {agendamentos.map((ag) => (
-              <Paper key={ag.id} sx={{ mb: 2, p: 2 }}>
-                <Typography>
-                  <b>Cliente:</b> {ag.cliente_nome}
-                </Typography>
-                <Typography>
-                  <b>Horário:</b> {format(new Date(ag.data), "HH:mm")}
-                </Typography>
-                {/* Adicione mais campos conforme necessário */}
+              <Paper
+                key={ag.id}
+                sx={{
+                  mb: 3,
+                  p: 2.5,
+                  position: "relative",
+                  borderRadius: 3,
+                  // Gradiente em azul escuro
+                  background:
+                    "linear-gradient(135deg, #223a5e 60%, #0a2342 100%)",
+                  color: "#fff",
+                  boxShadow: "0 4px 24px 0 rgba(34, 58, 94, 0.18)",
+                  overflow: "hidden",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                  "&:hover": {
+                    transform: "translateY(-2px) scale(1.01)",
+                    boxShadow: "0 8px 32px 0 rgba(34, 58, 94, 0.28)",
+                  },
+                }}
+              >
+                {/* Status no topo direito do card */}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    top: 18,
+                    right: 18,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    zIndex: 2,
+                  }}
+                >
+                  <Box
+                    sx={{
+                      bgcolor: statusBgColor(ag.status),
+                      color: "#fff",
+                      px: 2,
+                      py: 0.5,
+                      borderRadius: 2,
+                      fontWeight: 700,
+                      fontSize: 15,
+                      boxShadow: 2,
+                      textTransform: "uppercase",
+                      letterSpacing: 1,
+                      border: "2px solid #fff",
+                    }}
+                  >
+                    {statusLabel(ag.status)}
+                  </Box>
+                </Box>
+                <Box sx={{ position: "relative", zIndex: 1 }}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      mb: 1,
+                      letterSpacing: 0.5,
+                      color: "#fff",
+                      textShadow: "0 1px 4px rgba(0,0,0,0.10)",
+                    }}
+                  >
+                    {ag.servicos?.nome || "Serviço não informado"}
+                  </Typography>
+                  <Typography sx={{ mb: 0.5 }}>
+                    <b>Paciente:</b> {ag.clientes?.nome || "Não informado"}
+                  </Typography>
+                  <Typography sx={{ mb: 0.5 }}>
+                    <b>Data:</b> {format(new Date(ag.data_hora), "dd/MM/yyyy")}
+                  </Typography>
+                  <Typography sx={{ mb: 0.5 }}>
+                    <b>Hora:</b> {format(new Date(ag.data_hora), "HH:mm")}
+                  </Typography>
+                  <Typography sx={{ mb: 0.5 }}>
+                    <b>Observações:</b> {ag.observacoes || "Nenhuma"}
+                  </Typography>
+                </Box>
+                {/* Efeito decorativo de fundo */}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    right: -60,
+                    bottom: -60,
+                    width: 160,
+                    height: 160,
+                    bgcolor: "rgba(255,255,255,0.10)",
+                    borderRadius: "50%",
+                    zIndex: 0,
+                  }}
+                />
               </Paper>
             ))}
           </Box>
@@ -387,6 +575,7 @@ function Dashboard() {
                           color: "white",
                         }}
                         title={!drawerOpen ? item.label : undefined}
+                        onClick={item.onClick}
                       >
                         <ListItemIcon
                           sx={{
